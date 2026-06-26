@@ -2,20 +2,12 @@ import json
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
 
-import firebase_admin
-from firebase_admin import auth, credentials
 from fastapi import HTTPException, status, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import JWTError, jwt
 
 from app.core.config import settings
-
-# Initialize Firebase Admin
-try:
-    cred = credentials.Certificate(settings.FIREBASE_SERVICE_ACCOUNT_KEY_PATH)
-    firebase_admin.initialize_app(cred)
-except Exception as e:
-    print(f"Firebase initialization error: {e}")
+from app.core.firebase_client import firebase_client
 
 security = HTTPBearer()
 
@@ -27,8 +19,8 @@ async def get_current_user(
     Validate Firebase JWT token and return user info with custom claims
     """
     try:
-        # Verify the Firebase ID token
-        decoded_token = auth.verify_id_token(credentials.credentials)
+        # Verify the Firebase ID token usando o novo cliente
+        decoded_token = firebase_client.verify_token(credentials.credentials)
         
         # Get user info from Firebase
         uid = decoded_token.get('uid')
@@ -50,20 +42,19 @@ async def get_current_user(
             'custom_claims': decoded_token,
         }
         
-    except auth.ExpiredIdTokenError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token has expired",
-        )
-    except auth.InvalidIdTokenError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token",
-        )
     except Exception as e:
+        # O novo cliente já trata os diferentes tipos de erro
+        error_msg = str(e).lower()
+        if "expired" in error_msg:
+            detail = "Token has expired"
+        elif "invalid" in error_msg:
+            detail = "Invalid token"
+        else:
+            detail = f"Token validation error: {str(e)}"
+        
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"Token validation error: {str(e)}",
+            detail=detail,
         )
 
 

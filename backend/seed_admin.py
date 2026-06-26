@@ -14,8 +14,7 @@ sys.path.append(str(Path(__file__).parent))
 
 from app.core.config import settings
 from app.core.security import get_current_user
-import firebase_admin
-from firebase_admin import auth, credentials
+from app.core.firebase_client import firebase_client, diagnose_firebase_config
 from fastapi import HTTPException
 import httpx
 
@@ -25,15 +24,15 @@ async def seed_admin():
     
     print("🔧 Configurando Firebase Admin...")
     
-    # Initialize Firebase Admin
-    try:
-        cred = credentials.Certificate(settings.FIREBASE_SERVICE_ACCOUNT_KEY_PATH)
-        if not firebase_admin._apps:
-            firebase_admin.initialize_app(cred)
-        print("✅ Firebase Admin inicializado com sucesso")
-    except Exception as e:
-        print(f"❌ Erro ao inicializar Firebase: {e}")
+    # Diagnosticar configuração Firebase
+    config_info = diagnose_firebase_config()
+    print(f"📊 Config Firebase: {config_info}")
+    
+    if not config_info["initialized"]:
+        print("❌ Firebase não inicializado. Verifique as configurações.")
         return
+    
+    print("✅ Firebase Admin inicializado com sucesso")
     
     admin_email = os.getenv("ADMIN_SEED_EMAIL")
     admin_password = os.getenv("ADMIN_SEED_PASSWORD")
@@ -50,7 +49,7 @@ async def seed_admin():
     try:
         # Check if user already exists
         try:
-            user = auth.get_user_by_email(admin_email)
+            user = firebase_client.get_user_by_email(admin_email)
             print(f"👤 Usuário encontrado: {user.uid}")
             
             # Check if already has mestre_do_universo role
@@ -62,7 +61,7 @@ async def seed_admin():
                 return
             
             # Update existing user to mestre_do_universo role
-            auth.set_custom_user_claims(user.uid, {
+            firebase_client.set_custom_claims(user.uid, {
                 'role': 'mestre_do_universo',
                 'is_seed': True,
             })
@@ -72,18 +71,18 @@ async def seed_admin():
             print(f"   Email: {user.email}")
             print(f"   Role: mestre_do_universo")
             
-        except auth.UserNotFoundError:
+        except Exception:
             print("👤 Usuário não encontrado, criando novo...")
             
             # User doesn't exist, create new one
-            user = auth.create_user(
+            user = firebase_client.create_user(
                 email=admin_email,
                 password=admin_password,
                 email_verified=True,
             )
             
             # Set custom claims for the new user
-            auth.set_custom_user_claims(user.uid, {
+            firebase_client.set_custom_claims(user.uid, {
                 'role': 'mestre_do_universo',
                 'is_seed': True,
             })

@@ -43,8 +43,11 @@ class Settings(BaseSettings):
     # Redis
     REDIS_URL: str = "redis://localhost:6379/0"
     
-    # Firebase
-    FIREBASE_SERVICE_ACCOUNT_KEY_PATH: str = "./serviceAccount.json"
+    # Firebase - Suporte para ambos: Environment Variables e arquivo JSON
+    FIREBASE_PROJECT_ID: Optional[str] = None
+    FIREBASE_PRIVATE_KEY: Optional[str] = None
+    FIREBASE_CLIENT_EMAIL: Optional[str] = None
+    FIREBASE_SERVICE_ACCOUNT_KEY_PATH: Optional[str] = None
     
     # External APIs
     SIENGE_API_URL: str = "https://api.sienge.com.br"
